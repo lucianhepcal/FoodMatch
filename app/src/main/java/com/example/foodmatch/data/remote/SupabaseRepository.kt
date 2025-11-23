@@ -40,7 +40,7 @@ class SupabaseRepository {
 
         return try {
             client.postgrest.rpc(
-                funtion = "find_matching_recipes",
+                function = "find_matching_recipes",
                 parameters = mapOf("pantry_ids" to myPantryIds.toList())
             ).decodeList<RecipeMatch>()
         }catch (e: Exception) {
