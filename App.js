@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase/supabaseClient';
 
 import {
@@ -14,51 +14,103 @@ import {
 } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
 
-// --- MOCK DATA (Replace this with Supabase calls later) ---
-const MOCK_RECIPES = [
-  {
-    id: 1,
-    title: "Classic Omelette",
-    time: "10 min",
-    difficulty: "Easy",
-    icon: "egg",
-    ingredients: ["eggs", "milk", "cheese", "butter"],
-  },
-  {
-    id: 2,
-    title: "Spaghetti Carbonara",
-    time: "20 min",
-    difficulty: "Medium",
-    icon: "utensils",
-    ingredients: ["pasta", "eggs", "bacon", "cheese", "pepper"],
-  },
-  {
-    id: 3,
-    title: "Grilled Cheese",
-    time: "5 min",
-    difficulty: "Easy",
-    icon: "bread-slice",
-    ingredients: ["bread", "cheese", "butter"],
-  },
-  {
-    id: 4,
-    title: "Chicken Salad",
-    time: "15 min",
-    difficulty: "Easy",
-    icon: "leaf",
-    ingredients: ["chicken", "lettuce", "tomato", "cucumber", "dressing"],
-  },
-  {
-    id: 5,
-    title: "Pancakes",
-    time: "20 min",
-    difficulty: "Medium",
-    icon: "stroopwafel", // closest to pancake in FA5 free
-    ingredients: ["flour", "milk", "eggs", "sugar", "butter"],
-  }
-];
+function AuthScreen() {
+  const [mode, setMode] = useState('login');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-export default function App() {
+  const handleAuth = async () => {
+    if (!email.trim() || !password.trim()) return;
+    setLoading(true);
+    setError(null);
+
+    try {
+      if (mode === 'login') {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password: password.trim(),
+        });
+        if (error) setError(error.message);
+      } else {
+        const { error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password: password.trim(),
+        });
+        if (error) setError(error.message);
+      }
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.authContainer}>
+      <StatusBar barStyle="dark-content" />
+      <View style={styles.header}>
+        <Text style={styles.title}>
+          Food<Text style={styles.titleHighlight}>Match</Text>
+        </Text>
+        <Text style={styles.subtitle}>
+          {mode === 'login' ? 'Log in to continue' : 'Create an account'}
+        </Text>
+      </View>
+
+      <View style={styles.authCard}>
+        <Text style={styles.sectionTitle}>Email</Text>
+        <TextInput
+          style={styles.authInput}
+          placeholder="you@example.com"
+          autoCapitalize="none"
+          keyboardType="email-address"
+          value={email}
+          onChangeText={setEmail}
+        />
+
+        <Text style={[styles.sectionTitle, { marginTop: 16 }]}>Password</Text>
+        <TextInput
+          style={styles.authInput}
+          placeholder="********"
+          secureTextEntry
+          value={password}
+          onChangeText={setPassword}
+        />
+
+        {error && (
+          <Text style={styles.Error}>{error}</Text>
+        )}
+
+        <TouchableOpacity
+          onPress={handleAuth}
+          style={[styles.mainButton, styles.buttonActive, { marginTop: 24 }]}
+          disabled={loading}
+        >
+          <Text style={styles.buttonText}>
+            {loading
+              ? (mode === 'login' ? 'Logging in...' : 'Signing up...')
+              : (mode === 'login' ? 'Log In' : 'Sign Up')}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => setMode(mode === 'login' ? 'signup' : 'login')}
+          style={{ marginTop: 16 }}
+        >
+          <Text style={styles.switchText}>
+            {mode === 'login'
+              ? "Don't have an account? Sign up"
+              : 'Already have an account? Log in'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+function FoodMatchApp({ user }) {
   // --- STATE ---
   const [myIngredients, setMyIngredients] = useState([]);
   const [inputValue, setInputValue] = useState("");
@@ -84,10 +136,12 @@ export default function App() {
     if (myIngredients.length === 0) return;
     setIsLoading(true);
 
-    // 1) fetch recipes from Supabase
     const { data, error } = await supabase
       .from('recipes')
-      .select('id, name, time, difficulty, image, ingredients');
+      .select('id, name, image, difficulty, time, ingredients');
+
+    console.log('Supabase data:', data);
+    console.log('Supabase error:', error);
 
     if (error) {
       console.log('Supabase error:', error);
@@ -95,9 +149,7 @@ export default function App() {
       return;
     }
 
-    // 2) map to the shape your UI expects
-    const results = data.map((recipe) => {
-      // ensure ingredients is an array
+    const results = (data || []).map((recipe) => {
       const ing = Array.isArray(recipe.ingredients)
         ? recipe.ingredients
         : (recipe.ingredients ?? []);
@@ -113,7 +165,7 @@ export default function App() {
         title: recipe.name,
         time: recipe.time || '–',
         difficulty: recipe.difficulty || '–',
-        icon: 'utensils',         // or store icon in DB later
+        icon: recipe.image,
         ingredients: ing,
         have,
         missing,
@@ -123,21 +175,23 @@ export default function App() {
       .filter((r) => r.have.length > 0)
       .sort((a, b) => b.matchPercentage - a.matchPercentage);
 
+    console.log('Mapped results:', results);
+
     setMatchedRecipes(results);
     setActiveTab('recipes');
     setIsLoading(false);
   };
-
 
   // --- RENDER HELPERS ---
   const renderFridge = () => (
     <ScrollView contentContainerStyle={styles.contentContainer}>
       <View style={styles.header}>
         <Text style={styles.title}>Food<Text style={styles.titleHighlight}>Match</Text></Text>
-        <Text style={styles.subtitle}>What's in your kitchen?</Text>
+        <Text style={styles.subtitle}>
+          {user?.email ? `Welcome, ${user.email}` : "What's in your kitchen?"}
+        </Text>
       </View>
 
-      {/* Input Area */}
       <View style={styles.inputContainer}>
         <FontAwesome5 name="search" size={18} color="#9CA3AF" style={styles.inputIcon} />
         <TextInput 
@@ -145,7 +199,7 @@ export default function App() {
           placeholder="Add ingredient (e.g. eggs)..."
           value={inputValue}
           onChangeText={setInputValue}
-          onSubmitEditing={addIngredient} // Handle 'Enter' on keyboard
+          onSubmitEditing={addIngredient}
           returnKeyType="done"
         />
         <TouchableOpacity onPress={addIngredient} style={styles.addButton}>
@@ -153,7 +207,6 @@ export default function App() {
         </TouchableOpacity>
       </View>
 
-      {/* Ingredients List */}
       <View style={styles.listHeader}>
         <Text style={styles.sectionTitle}>Your Ingredients ({myIngredients.length})</Text>
         {myIngredients.length > 0 && (
@@ -181,7 +234,6 @@ export default function App() {
         )}
       </View>
 
-      {/* Main Action Button */}
       <TouchableOpacity 
         onPress={findRecipes}
         disabled={myIngredients.length === 0}
@@ -222,10 +274,9 @@ export default function App() {
       ) : (
         matchedRecipes.map(recipe => (
           <View key={recipe.id} style={styles.card}>
-            {/* Card Header */}
             <View style={styles.cardHeader}>
               <View style={styles.iconBox}>
-                <FontAwesome5 name={recipe.icon} size={24} color="#F97316" />
+                <FontAwesome5 name={recipe.icon || 'utensils'} size={24} color="#F97316" />
               </View>
               <View style={styles.cardHeaderText}>
                 <Text style={styles.cardTitle}>{recipe.title}</Text>
@@ -236,7 +287,6 @@ export default function App() {
               </View>
             </View>
 
-            {/* Progress Bar */}
             <View style={styles.progressBarBg}>
               <View 
                 style={[
@@ -246,7 +296,6 @@ export default function App() {
               />
             </View>
 
-            {/* Details */}
             <View style={styles.cardBody}>
               <Text style={styles.haveText}>
                 <FontAwesome5 name="check" size={12} /> You have: {recipe.have.join(", ")}
@@ -267,12 +316,10 @@ export default function App() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
       
-      {/* Content Area */}
       <View style={{flex: 1}}>
         {activeTab === 'fridge' ? renderFridge() : renderRecipes()}
       </View>
 
-      {/* Bottom Tab Bar */}
       <View style={styles.tabBar}>
         <TouchableOpacity 
           style={styles.tabItem} 
@@ -290,13 +337,52 @@ export default function App() {
           <Text style={[styles.tabText, activeTab === 'recipes' && styles.tabTextActive]}>Recipes</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.tabItem}>
+        <TouchableOpacity 
+          style={styles.tabItem}
+          onPress ={() => supabase.auth.signOut()}
+        >
           <FontAwesome5 name="user" size={20} color="#9CA3AF" />
-          <Text style={styles.tabText}>Profile</Text>
+          <Text style={styles.tabText}>Logout</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
+}
+
+export default function App() {
+  const [session, setSession] = useState(null);
+  const [loadingSession, setLoadingSession] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setLoadingSession(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setSession(session);
+      }
+    );
+    
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  if (loadingSession) {
+    return (
+      <SafeAreaView style={styles.authContainer}>
+        <Text>Loading...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (!session) {
+    return <AuthScreen />;
+  }
+
+  return <FoodMatchApp user={session.user} />;
 }
 
 // --- STYLES ---
@@ -306,9 +392,42 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
+  authContainer: {
+    flex: 1,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  authCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  authInput: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 4,
+  },
+  Error: {
+    color: '#B91C1C',
+    marginTop: 12,
+  },
+  switchText: {
+    color: '#6B7280',
+    textAlign: 'center',
+  },
   contentContainer: {
     padding: 20,
-    paddingBottom: 100, // Space for tab bar
+    paddingBottom: 100,
   },
   header: {
     alignItems: 'center',
@@ -436,7 +555,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
-  // Recipe Results Styles
   resultsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -526,7 +644,6 @@ const styles = StyleSheet.create({
     color: '#EF4444',
     fontWeight: '500',
   },
-  // Tab Bar
   tabBar: {
     flexDirection: 'row',
     backgroundColor: 'white',
@@ -547,5 +664,5 @@ const styles = StyleSheet.create({
   },
   tabTextActive: {
     color: '#F97316',
-  }
+  },
 });
