@@ -1,6 +1,4 @@
 import React, { useState } from 'react';
-import { supabase } from './supabase/supabaseClient';
-
 import {
   Platform,
   SafeAreaView,
@@ -10,60 +8,23 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
+  Alert // Am adaugat Alert pentru erori
 } from 'react-native';
 import { FontAwesome5 } from '@expo/vector-icons';
 
-// --- MOCK DATA (Replace this with Supabase calls later) ---
-const MOCK_RECIPES = [
-  {
-    id: 1,
-    title: "Classic Omelette",
-    time: "10 min",
-    difficulty: "Easy",
-    icon: "egg",
-    ingredients: ["eggs", "milk", "cheese", "butter"],
-  },
-  {
-    id: 2,
-    title: "Spaghetti Carbonara",
-    time: "20 min",
-    difficulty: "Medium",
-    icon: "utensils",
-    ingredients: ["pasta", "eggs", "bacon", "cheese", "pepper"],
-  },
-  {
-    id: 3,
-    title: "Grilled Cheese",
-    time: "5 min",
-    difficulty: "Easy",
-    icon: "bread-slice",
-    ingredients: ["bread", "cheese", "butter"],
-  },
-  {
-    id: 4,
-    title: "Chicken Salad",
-    time: "15 min",
-    difficulty: "Easy",
-    icon: "leaf",
-    ingredients: ["chicken", "lettuce", "tomato", "cucumber", "dressing"],
-  },
-  {
-    id: 5,
-    title: "Pancakes",
-    time: "20 min",
-    difficulty: "Medium",
-    icon: "stroopwafel", // closest to pancake in FA5 free
-    ingredients: ["flour", "milk", "eggs", "sugar", "butter"],
-  }
-];
+// --- CONFIGURARE API ---
+// Schimba aici in functie de unde rulezi aplicatia (vezi nota de mai sus)
+const API_URL = Platform.OS === 'android' 
+  ? "http://192.168.1.242:3000/api/recipes" 
+  : "http://192.168.1.242:3000/api/recipes"; 
 
 export default function App() {
   // --- STATE ---
   const [myIngredients, setMyIngredients] = useState([]);
   const [inputValue, setInputValue] = useState("");
   const [matchedRecipes, setMatchedRecipes] = useState([]);
-  const [activeTab, setActiveTab] = useState("fridge"); // 'fridge' or 'recipes'
+  const [activeTab, setActiveTab] = useState("fridge");
   const [isLoading, setIsLoading] = useState(false);
 
   // --- HANDLERS ---
@@ -80,56 +41,64 @@ export default function App() {
     setMyIngredients(myIngredients.filter(i => i !== ing));
   };
 
+  // --- MODIFICAREA PRINCIPALA ESTE AICI ---
   const findRecipes = async () => {
     if (myIngredients.length === 0) return;
     setIsLoading(true);
 
-    // 1) fetch recipes from Supabase
-    const { data, error } = await supabase
-      .from('recipes')
-      .select('id, name, time, difficulty, image, ingredients');
+    try {
+      // 1) Fetch recipes from Express API (REST)
+      const response = await fetch(API_URL);
+      
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
 
-    if (error) {
-      console.log('Supabase error:', error);
-      setIsLoading(false);
-      return;
-    }
+      const data = await response.json(); // Array-ul de retete din Postgres
 
-    // 2) map to the shape your UI expects
-    const results = data.map((recipe) => {
-      // ensure ingredients is an array
-      const ing = Array.isArray(recipe.ingredients)
-        ? recipe.ingredients
-        : (recipe.ingredients ?? []);
+      // 2) Logica de filtrare (Map to UI shape)
+      // Aceasta ramane pe frontend pentru a calcula procentele dinamic
+      const results = data.map((recipe) => {
+        // Postgres JSONB vine direct ca array, dar facem o verificare de siguranta
+        const ing = Array.isArray(recipe.ingredients)
+          ? recipe.ingredients
+          : (recipe.ingredients ?? []);
 
-      const have = ing.filter((i) => myIngredients.includes(i));
-      const missing = ing.filter((i) => !myIngredients.includes(i));
-      const matchPercentage = ing.length
-        ? (have.length / ing.length) * 100
-        : 0;
+        const have = ing.filter((i) => myIngredients.includes(i));
+        const missing = ing.filter((i) => !myIngredients.includes(i));
+        const matchPercentage = ing.length
+          ? (have.length / ing.length) * 100
+          : 0;
 
-      return {
-        id: recipe.id,
-        title: recipe.name,
-        time: recipe.time || '–',
-        difficulty: recipe.difficulty || '–',
-        icon: 'utensils',         // or store icon in DB later
-        ingredients: ing,
-        have,
-        missing,
-        matchPercentage,
-      };
-    })
+        return {
+          id: recipe.id,
+          title: recipe.name, // Atentie: in DB am pus 'name', UI-ul tau vrea 'title'
+          time: recipe.time || '–',
+          difficulty: recipe.difficulty || '–',
+          icon: recipe.image || 'utensils', // Folosim coloana image pentru icon
+          ingredients: ing,
+          have,
+          missing,
+          matchPercentage,
+        };
+      })
       .filter((r) => r.have.length > 0)
       .sort((a, b) => b.matchPercentage - a.matchPercentage);
 
-    setMatchedRecipes(results);
-    setActiveTab('recipes');
-    setIsLoading(false);
+      setMatchedRecipes(results);
+      setActiveTab('recipes');
+
+    } catch (error) {
+      console.error('API Error:', error);
+      Alert.alert("Error", "Could not fetch recipes from server. Is it running?");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-
-  // --- RENDER HELPERS ---
+  // ... RESTUL CODULUI DE RENDER (renderFridge, renderRecipes, return) RAMANE NESCHIMBAT ...
+  // (Copiaza functiile renderFridge si renderRecipes din codul tau original aici)
+  
   const renderFridge = () => (
     <ScrollView contentContainerStyle={styles.contentContainer}>
       <View style={styles.header}>
@@ -145,7 +114,7 @@ export default function App() {
           placeholder="Add ingredient (e.g. eggs)..."
           value={inputValue}
           onChangeText={setInputValue}
-          onSubmitEditing={addIngredient} // Handle 'Enter' on keyboard
+          onSubmitEditing={addIngredient}
           returnKeyType="done"
         />
         <TouchableOpacity onPress={addIngredient} style={styles.addButton}>
@@ -222,7 +191,6 @@ export default function App() {
       ) : (
         matchedRecipes.map(recipe => (
           <View key={recipe.id} style={styles.card}>
-            {/* Card Header */}
             <View style={styles.cardHeader}>
               <View style={styles.iconBox}>
                 <FontAwesome5 name={recipe.icon} size={24} color="#F97316" />
@@ -236,7 +204,6 @@ export default function App() {
               </View>
             </View>
 
-            {/* Progress Bar */}
             <View style={styles.progressBarBg}>
               <View 
                 style={[
@@ -246,7 +213,6 @@ export default function App() {
               />
             </View>
 
-            {/* Details */}
             <View style={styles.cardBody}>
               <Text style={styles.haveText}>
                 <FontAwesome5 name="check" size={12} /> You have: {recipe.have.join(", ")}
@@ -266,13 +232,9 @@ export default function App() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      
-      {/* Content Area */}
       <View style={{flex: 1}}>
         {activeTab === 'fridge' ? renderFridge() : renderRecipes()}
       </View>
-
-      {/* Bottom Tab Bar */}
       <View style={styles.tabBar}>
         <TouchableOpacity 
           style={styles.tabItem} 
@@ -299,7 +261,7 @@ export default function App() {
   );
 }
 
-// --- STYLES ---
+// STYLES raman aceleasi din codul tau original
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -308,7 +270,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: 20,
-    paddingBottom: 100, // Space for tab bar
+    paddingBottom: 100, 
   },
   header: {
     alignItems: 'center',
@@ -436,7 +398,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
-  // Recipe Results Styles
   resultsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -526,7 +487,6 @@ const styles = StyleSheet.create({
     color: '#EF4444',
     fontWeight: '500',
   },
-  // Tab Bar
   tabBar: {
     flexDirection: 'row',
     backgroundColor: 'white',
