@@ -16,8 +16,8 @@ import { FontAwesome5 } from '@expo/vector-icons';
 // --- CONFIGURARE API ---
 // Schimba aici in functie de unde rulezi aplicatia (vezi nota de mai sus)
 const API_URL = Platform.OS === 'android' 
-  ? "http://192.168.1.242:3000/api/recipes" 
-  : "http://192.168.1.242:3000/api/recipes"; 
+  ? "http://192.168.1.134:3000/api/recipes" 
+  : "http://192.168.1.134:3000/api/recipes"; 
 
 export default function App() {
   // --- STATE ---
@@ -95,10 +95,7 @@ export default function App() {
       setIsLoading(false);
     }
   };
-
-  // ... RESTUL CODULUI DE RENDER (renderFridge, renderRecipes, return) RAMANE NESCHIMBAT ...
-  // (Copiaza functiile renderFridge si renderRecipes din codul tau original aici)
-  
+  // --- RENDERING ---  
   const renderFridge = () => (
     <ScrollView contentContainerStyle={styles.contentContainer}>
       <View style={styles.header}>
