@@ -26,6 +26,7 @@ export default function App() {
   const [matchedRecipes, setMatchedRecipes] = useState([]);
   const [activeTab, setActiveTab] = useState("fridge");
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedRecipe, setSelectedRecipe] = useState(null);
 
   // --- HANDLERS ---
   const addIngredient = () => {
@@ -59,10 +60,17 @@ export default function App() {
       // 2) Logica de filtrare (Map to UI shape)
       // Aceasta ramane pe frontend pentru a calcula procentele dinamic
       const results = data.map((recipe) => {
-        // Postgres JSONB vine direct ca array, dar facem o verificare de siguranta
-        const ing = Array.isArray(recipe.ingredients)
-          ? recipe.ingredients
-          : (recipe.ingredients ?? []);
+        // Parse ingredients - handle both array and JSON string formats
+        let ing = [];
+        if (Array.isArray(recipe.ingredients)) {
+          ing = recipe.ingredients;
+        } else if (typeof recipe.ingredients === 'string') {
+          try {
+            ing = JSON.parse(recipe.ingredients);
+          } catch (e) {
+            ing = [];
+          }
+        }
 
         const have = ing.filter((i) => myIngredients.includes(i));
         const missing = ing.filter((i) => !myIngredients.includes(i));
@@ -80,6 +88,7 @@ export default function App() {
           have,
           missing,
           matchPercentage,
+          steps: Array.isArray(recipe.steps) ? recipe.steps : (typeof recipe.steps === 'string' ? JSON.parse(recipe.steps) : []),
         };
       })
       .filter((r) => r.have.length > 0)
@@ -187,7 +196,7 @@ export default function App() {
         </View>
       ) : (
         matchedRecipes.map(recipe => (
-          <View key={recipe.id} style={styles.card}>
+          <TouchableOpacity key={recipe.id} style={styles.card} onPress={() => setSelectedRecipe(recipe)}>
             <View style={styles.cardHeader}>
               <View style={styles.iconBox}>
                 <FontAwesome5 name={recipe.icon} size={24} color="#F97316" />
@@ -220,9 +229,74 @@ export default function App() {
                 </Text>
               )}
             </View>
-          </View>
+          </TouchableOpacity>
         ))
       )}
+    </ScrollView>
+  );
+
+  const renderRecipeDetails = () => (
+    <ScrollView contentContainerStyle={styles.contentContainer}>
+      <View style={styles.detailsHeader}>
+        <TouchableOpacity onPress={() => setSelectedRecipe(null)} style={styles.backButton}>
+          <FontAwesome5 name="arrow-left" size={24} color="#F97316" />
+        </TouchableOpacity>
+        <Text style={styles.detailsTitle}>{selectedRecipe.title}</Text>
+      </View>
+
+      <View style={styles.detailsCard}>
+        <View style={styles.iconBox}>
+          <FontAwesome5 name={selectedRecipe.icon} size={48} color="#F97316" />
+        </View>
+        <Text style={styles.detailsRecipeMeta}>{selectedRecipe.time} • {selectedRecipe.difficulty}</Text>
+        <View style={styles.progressBarBg}>
+          <View 
+            style={[
+              styles.progressBarFill, 
+              { width: `${selectedRecipe.matchPercentage}%`, backgroundColor: selectedRecipe.matchPercentage === 100 ? '#22C55E' : '#FB923C' }
+            ]} 
+          />
+        </View>
+        <Text style={styles.matchBadgeText}>{Math.round(selectedRecipe.matchPercentage)}% Match</Text>
+      </View>
+
+      <View style={styles.ingredientsSection}>
+        <Text style={styles.sectionTitle}>Ingredients You Have</Text>
+        {selectedRecipe.have.map((ing, idx) => (
+          <View key={idx} style={styles.ingredientItem}>
+            <FontAwesome5 name="check-circle" size={16} color="#22C55E" />
+            <Text style={styles.ingredientText}>{ing}</Text>
+          </View>
+        ))}
+      </View>
+
+      {selectedRecipe.missing.length > 0 && (
+        <View style={styles.ingredientsSection}>
+          <Text style={styles.sectionTitle}>Missing Ingredients</Text>
+          {selectedRecipe.missing.map((ing, idx) => (
+            <View key={idx} style={styles.ingredientItem}>
+              <FontAwesome5 name="times-circle" size={16} color="#EF4444" />
+              <Text style={styles.ingredientTextMissing}>{ing}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      <View style={styles.stepsSection}>
+        <Text style={styles.sectionTitle}>Cooking Steps</Text>
+        {selectedRecipe.steps && selectedRecipe.steps.length > 0 ? (
+          selectedRecipe.steps.map((step, idx) => (
+            <View key={idx} style={styles.stepItem}>
+              <View style={styles.stepNumber}>
+                <Text style={styles.stepNumberText}>{idx + 1}</Text>
+              </View>
+              <Text style={styles.stepText}>{step}</Text>
+            </View>
+          ))
+        ) : (
+          <Text style={styles.noStepsText}>No steps available</Text>
+        )}
+      </View>
     </ScrollView>
   );
 
@@ -230,30 +304,38 @@ export default function App() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
       <View style={{flex: 1}}>
-        {activeTab === 'fridge' ? renderFridge() : renderRecipes()}
+        {selectedRecipe ? (
+          renderRecipeDetails()
+        ) : activeTab === 'fridge' ? (
+          renderFridge()
+        ) : (
+          renderRecipes()
+        )}
       </View>
-      <View style={styles.tabBar}>
-        <TouchableOpacity 
-          style={styles.tabItem} 
-          onPress={() => setActiveTab("fridge")}
-        >
-          <FontAwesome5 name="shopping-basket" size={20} color={activeTab === 'fridge' ? '#F97316' : '#9CA3AF'} />
-          <Text style={[styles.tabText, activeTab === 'fridge' && styles.tabTextActive]}>My Fridge</Text>
-        </TouchableOpacity>
+      {!selectedRecipe && (
+        <View style={styles.tabBar}>
+          <TouchableOpacity 
+            style={styles.tabItem} 
+            onPress={() => setActiveTab("fridge")}
+          >
+            <FontAwesome5 name="shopping-basket" size={20} color={activeTab === 'fridge' ? '#F97316' : '#9CA3AF'} />
+            <Text style={[styles.tabText, activeTab === 'fridge' && styles.tabTextActive]}>My Fridge</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.tabItem} 
-          onPress={() => setActiveTab("recipes")}
-        >
-          <FontAwesome5 name="utensils" size={20} color={activeTab === 'recipes' ? '#F97316' : '#9CA3AF'} />
-          <Text style={[styles.tabText, activeTab === 'recipes' && styles.tabTextActive]}>Recipes</Text>
-        </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.tabItem} 
+            onPress={() => setActiveTab("recipes")}
+          >
+            <FontAwesome5 name="utensils" size={20} color={activeTab === 'recipes' ? '#F97316' : '#9CA3AF'} />
+            <Text style={[styles.tabText, activeTab === 'recipes' && styles.tabTextActive]}>Recipes</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity style={styles.tabItem}>
-          <FontAwesome5 name="user" size={20} color="#9CA3AF" />
-          <Text style={styles.tabText}>Profile</Text>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity style={styles.tabItem}>
+            <FontAwesome5 name="user" size={20} color="#9CA3AF" />
+            <Text style={styles.tabText}>Profile</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -504,5 +586,112 @@ const styles = StyleSheet.create({
   },
   tabTextActive: {
     color: '#F97316',
-  }
+  },
+  detailsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+    marginTop: 16,
+  },
+  backButton: {
+    marginRight: 16,
+  },
+  detailsTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    flex: 1,
+  },
+  detailsCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center',
+    marginBottom: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  detailsRecipeMeta: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 12,
+    marginBottom: 16,
+  },
+  matchBadgeText: {
+    fontWeight: 'bold',
+    fontSize: 16,
+    color: '#F97316',
+    marginTop: 8,
+  },
+  ingredientsSection: {
+    marginBottom: 24,
+  },
+  ingredientItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  ingredientText: {
+    marginLeft: 12,
+    fontSize: 14,
+    color: '#15803D',
+    fontWeight: '500',
+  },
+  ingredientTextMissing: {
+    marginLeft: 12,
+    fontSize: 14,
+    color: '#DC2626',
+    fontWeight: '500',
+  },
+  stepsSection: {
+    marginBottom: 80,
+  },
+  stepItem: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    backgroundColor: 'white',
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  stepNumber: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F97316',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  stepNumberText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  stepText: {
+    flex: 1,
+    color: '#374151',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  noStepsText: {
+    color: '#9CA3AF',
+    fontSize: 14,
+    fontStyle: 'italic',
+  },
 });

@@ -26,7 +26,7 @@ const pool = new Pool({
 // Frontend-ul va face filtrarea (match percentage) exact cum facea inainte
 app.get('/api/recipes', async (req, res) => {
   try {
-    const result = await pool.query('SELECT id, name, time, difficulty, image, ingredients FROM recipes');
+    const result = await pool.query('SELECT id, name, time, difficulty, image, ingredients, steps FROM recipes');
     res.json(result.rows);
   } catch (err) {
     console.error(err.message);
