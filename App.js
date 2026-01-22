@@ -303,7 +303,7 @@ export default function App() {
           { transform: [{ rotate: panRotateInterpolate }] },
         ]}
       >
-        <FontAwesome5 name="frying-pan" size={80} color="#FEF3C7" />
+        <FontAwesome5 name="utensils" size={80} color="#FEF3C7" />
       </Animated.View>
 
       {/* Bottom left food */}
@@ -343,7 +343,7 @@ export default function App() {
             }
           ]}
         >
-        <Animated.View style={[styles.successIconContainer, {transform: [{rotate: panRotation}]}]}>
+        <Animated.View style={[styles.successIconContainer, {transform: [{rotate: panRotateInterpolate}]}]}>
           <FontAwesome5 name="check-circle" size={80} color="#10B981" />
         </Animated.View>
       
@@ -410,6 +410,8 @@ export default function App() {
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
+            editable={true}
+            selectTextOnFocus={false}
           />
         </View>
 
@@ -422,7 +424,9 @@ export default function App() {
             placeholderTextColor="#9CA3AF"
             value={password}
             onChangeText={setPassword}
-            secureTextEntry
+            secureTextEntry={true}
+            editable={true}
+            selectTextOnFocus={false}
           />
         </View>
 
@@ -476,6 +480,8 @@ export default function App() {
             value={signupName}
             onChangeText={setSignupName}
             autoCapitalize="words"
+            editable={true}
+            selectTextOnFocus={false}
           />
         </View>
 
@@ -490,6 +496,8 @@ export default function App() {
             onChangeText={setSignupEmail}
             keyboardType="email-address"
             autoCapitalize="none"
+            editable={true}
+            selectTextOnFocus={false}
           />
         </View>
 
@@ -502,7 +510,9 @@ export default function App() {
             placeholderTextColor="#9CA3AF"
             value={signupPassword}
             onChangeText={setSignupPassword}
-            secureTextEntry
+            secureTextEntry={true}
+            editable={true}
+            selectTextOnFocus={false}
           />
         </View>
 
@@ -515,7 +525,9 @@ export default function App() {
             placeholderTextColor="#9CA3AF"
             value={signupConfirmPassword}
             onChangeText={setSignupConfirmPassword}
-            secureTextEntry
+            secureTextEntry={true}
+            editable={true}
+            selectTextOnFocus={false}
           />
         </View>
 
@@ -567,6 +579,8 @@ export default function App() {
           onChangeText={setInputValue}
           onSubmitEditing={addIngredient}
           returnKeyType="done"
+          editable={true}
+          selectTextOnFocus={false}
         />
         <TouchableOpacity onPress={addIngredient} style={styles.addButton}>
           <FontAwesome5 name="plus" size={16} color="white" />
@@ -919,7 +933,9 @@ export default function App() {
                 placeholderTextColor="#9CA3AF"
                 value={oldPassword}
                 onChangeText={setOldPassword}
-                secureTextEntry
+                secureTextEntry={true}
+                editable={true}
+                selectTextOnFocus={false}
               />
             </View>
 
@@ -932,7 +948,9 @@ export default function App() {
                 placeholderTextColor="#9CA3AF"
                 value={newPassword}
                 onChangeText={setNewPassword}
-                secureTextEntry
+                secureTextEntry={true}
+                editable={true}
+                selectTextOnFocus={false}
               />
             </View>
 
@@ -945,7 +963,9 @@ export default function App() {
                 placeholderTextColor="#9CA3AF"
                 value={confirmNewPassword}
                 onChangeText={setConfirmNewPassword}
-                secureTextEntry
+                secureTextEntry={true}
+                editable={true}
+                selectTextOnFocus={false}
               />
             </View>
 
